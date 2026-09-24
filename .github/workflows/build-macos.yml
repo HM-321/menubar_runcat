@@ -1,0 +1,68 @@
+name: Build RunCat for macOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Show available schemes
+        run: |
+          xcodebuild \
+            -project "Menubar RunCat.xcodeproj" \
+            -list
+
+      - name: Build RunCat
+        run: |
+          xcodebuild \
+            -project "Menubar RunCat.xcodeproj" \
+            -scheme "Menubar RunCat" \
+            -configuration Release \
+            -derivedDataPath "$GITHUB_WORKSPACE/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Find built application
+        run: |
+          find "$GITHUB_WORKSPACE/build" \
+            -type d \
+            -name "*.app" \
+            -print
+
+      - name: Create ZIP
+        run: |
+          APP_PATH="$(find "$GITHUB_WORKSPACE/build" \
+            -type d \
+            -path "*/Build/Products/Release/*.app" \
+            -print \
+            -quit)"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "RunCat.appが見つかりません"
+            exit 1
+          fi
+
+          echo "Found: $APP_PATH"
+
+          ditto \
+            -c \
+            -k \
+            --sequesterRsrc \
+            --keepParent \
+            "$APP_PATH" \
+            "$GITHUB_WORKSPACE/RunCat-macOS.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RunCat-macOS
+          path: RunCat-macOS.zip
+          if-no-files-found: error
